@@ -10,7 +10,7 @@ import (
 
 func simple_acquire_lock(client *redis.Client, lockName string, timeout time.Duration) bool {
 	result := uuid.New().String()
-	lockKey := "lock:" + lockName
+	lockKey := LOCK_PREFIX + lockName
 
 	res, err := client.SetNX(lockKey, result, timeout).Result()
 	if err != nil {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis"
 )
+
+const LOCK_PREFIX = "lock:"
 
 var ctx = context.Background()
 
@@ -31,9 +34,18 @@ func main() {
 		must_acquire_lock(c, lock)
 	})
 
-	r.GET("/redsync-lock", func(c *gin.Context) {
-		lock := read_sync_lock(rs, "distributed_lock", time.Second*5)
-		must_acquire_lock(c, lock)
+	r.GET("/redlock", func(c *gin.Context) {
+		mutex := read_sync_lock(rs, "distributed_lock", time.Second*10)
+
+		fmt.Println("critical work...")
+		time.Sleep(time.Second * 5)
+
+		if ok, err := mutex.Unlock(); !ok || err != nil {
+			fmt.Println(err)
+			panic("unlock failed")
+		}
+
+		c.JSON(http.StatusOK, "unlocked")
 	})
 
 	r.Run()
