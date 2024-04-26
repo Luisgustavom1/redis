@@ -36,6 +36,10 @@ func main() {
 
 	r.GET("/redlock", func(c *gin.Context) {
 		mutex := read_sync_lock(rs, "distributed_lock", time.Second*10)
+		if mutex == nil {
+			c.JSON(http.StatusInternalServerError, "failed to acquire lock")
+			return
+		}
 
 		fmt.Println("critical work...")
 		time.Sleep(time.Second * 5)

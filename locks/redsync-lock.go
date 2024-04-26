@@ -15,7 +15,7 @@ func read_sync_lock(rs *redsync.Redsync, lockName string, timeout time.Duration)
 	mutex := rs.NewMutex(lock_key, options...)
 
 	if err := mutex.Lock(); err != nil {
-		panic(err)
+		return nil
 	}
 
 	return mutex
