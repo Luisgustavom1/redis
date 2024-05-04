@@ -2,11 +2,11 @@ package queue
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/luisgustavom1/redis/queue/logger"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -47,9 +47,10 @@ func (c *Consumer) StartReliableConsumer(ctx context.Context, id int, rdb *redis
 }
 
 func startReliableConsumerRecover(ctx context.Context, c *Consumer, id int, rdb *redis.Client, wg *sync.WaitGroup) {
-	fmt.Printf("[ERROR] consumer %d crashes, trying to recover...\n", id)
+	l := logger.NewLogger(id, "R CONSUMER")
+	l.Errorln("consumer %d crashes, trying to recover...", id)
 	for i := 0; i < MAX_RETRIES; i++ {
-		fmt.Println("[RECOVERING] Attempt", i+1)
+		l.Infof("[RECOVERING] Attempt %d\n", i+1)
 		// to simulate retries
 		r := rand.Intn(100)
 		if r%2 == 0 {
@@ -62,30 +63,32 @@ func startReliableConsumerRecover(ctx context.Context, c *Consumer, id int, rdb 
 }
 
 func consumer(ctx context.Context, id int, rdb *redis.Client) {
-	fmt.Printf("[%d::CONSUMER] working\n", id)
+	l := logger.NewLogger(id, "CONSUMER")
+	l.Infof("working\n")
 	for {
 		job, err := rdb.BRPop(ctx, 0, JOB_QUEUE_KEY).Result()
 		if err != nil {
-			fmt.Println(err)
+			l.Errorln(err.Error())
 			break
 		}
 
-		fmt.Printf("[%d::CONSUMER] processing %s\n", id, job[1])
+		l.Infof("processing %s\n", job[1])
 	}
 }
 
 func reliableConsumer(ctx context.Context, id int, rdb *redis.Client) {
-	fmt.Printf("[%d::R CONSUMER] working\n", id)
+	l := logger.NewLogger(id, "R CONSUMER")
+	l.Infof("working\n")
 	for jobRecovered, err := getFromTempQueue(ctx, rdb); jobRecovered != ""; jobRecovered, err = getFromTempQueue(ctx, rdb) {
 		if err != nil {
-			fmt.Println(err)
+			l.Errorln(err.Error())
 			return
 		}
 
-		fmt.Printf("[%d::R CONSUMER] processing recovered %s\n", id, jobRecovered)
+		l.Infof("processing recovered %s\n", jobRecovered)
 		_, err := popFromTempQueue(ctx, rdb, jobRecovered)
 		if err != nil {
-			fmt.Println(err)
+			l.Errorln(err.Error())
 			return
 		}
 	}
@@ -93,17 +96,17 @@ func reliableConsumer(ctx context.Context, id int, rdb *redis.Client) {
 	for {
 		job, err := rdb.BRPopLPush(ctx, JOB_QUEUE_KEY, TEMP_QUEUE_KEY, 0).Result()
 		if err != nil {
-			fmt.Println(err)
+			l.Errorln(err.Error())
 			break
 		}
 		select {
 		case <-ctx.Done():
 			panic("crash!!")
 		default:
-			fmt.Printf("[%d::R CONSUMER] processing %s\n", id, job)
+			l.Infof("processing %s\n", job)
 			_, err := popFromTempQueue(ctx, rdb, job)
 			if err != nil {
-				fmt.Println(err)
+				l.Errorln(err.Error())
 				return
 			}
 		}
