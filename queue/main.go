@@ -24,7 +24,7 @@ func consumer(ctx context.Context, k int, rdb *redis.Client, wg *sync.WaitGroup)
 			break
 		}
 
-		fmt.Printf("consumer %d job: %s\n", k, job)
+		fmt.Printf("consumer %d job: %s\n", k, job[1])
 	}
 }
 
@@ -34,12 +34,20 @@ func startConsumer(ctx context.Context, k int, rdb *redis.Client, wg *sync.WaitG
 }
 
 func producer(ctx context.Context, rdb *redis.Client) {
-	time.Sleep(3 * time.Second)
 	fmt.Sprintln("Pushing jobs to the queue")
 
-	for i := 0; i < 10; i++ {
-		rdb.LPush(ctx, JOB_QUEUE_KEY, fmt.Sprintf("key: %d", i+1))
-		time.Sleep(1 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
+
+	i := 1
+	for {
+		select {
+		case <-ctx.Done():
+			ticker.Stop()
+			return
+		case <-ticker.C:
+			rdb.LPush(ctx, JOB_QUEUE_KEY, fmt.Sprintf("job: %d", i))
+			i++
+		}
 	}
 }
 
