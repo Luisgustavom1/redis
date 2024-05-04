@@ -21,9 +21,10 @@ func main() {
 	go queue.StartProducer(ctx, rdb)
 
 	consumer := queue.NewConsumerClient()
-	consumer.StartConsumer(ctx, rdb, &wg)
-	consumer.StartConsumer(ctx, rdb, &wg)
-	consumer.StartReliableConsumer(ctx, rdb, &wg)
+	wg.Add(3)
+	go consumer.StartConsumer(ctx, 1, rdb, &wg)
+	go consumer.StartConsumer(ctx, 2, rdb, &wg)
+	go consumer.StartReliableConsumer(ctx, 3, rdb, &wg)
 
 	wg.Wait()
 }

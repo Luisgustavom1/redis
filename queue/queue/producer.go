@@ -16,9 +16,6 @@ func StartProducer(ctx context.Context, rdb *redis.Client) {
 	i := 1
 	for {
 		select {
-		case <-ctx.Done():
-			ticker.Stop()
-			return
 		case <-ticker.C:
 			rdb.LPush(ctx, JOB_QUEUE_KEY, fmt.Sprintf("job: %d", i))
 			i++

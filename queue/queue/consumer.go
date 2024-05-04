@@ -14,36 +14,32 @@ const JOB_QUEUE_KEY = "job_queue"
 const TEMP_QUEUE_KEY = "temp_queue"
 
 type ConsumerClient interface {
-	StartConsumer(ctx context.Context, rdb *redis.Client, wg *sync.WaitGroup)
-	StartReliableConsumer(ctx context.Context, rdb *redis.Client, wg *sync.WaitGroup)
+	StartConsumer(ctx context.Context, key int, rdb *redis.Client, wg *sync.WaitGroup)
+	StartReliableConsumer(ctx context.Context, key int, rdb *redis.Client, wg *sync.WaitGroup)
 }
 
-type Consumer struct {
-	count int
-}
+type Consumer struct{}
 
 func NewConsumerClient() ConsumerClient {
-	return &Consumer{
-		count: 0,
-	}
+	return &Consumer{}
 }
 
-func (c Consumer) StartConsumer(ctx context.Context, rdb *redis.Client, wg *sync.WaitGroup) {
-	wg.Add(1)
-	c.count++
-	go consumer(ctx, c.count, rdb, wg)
+func (c *Consumer) StartConsumer(ctx context.Context, key int, rdb *redis.Client, wg *sync.WaitGroup) {
+	consumer(ctx, key, rdb, wg)
 }
 
-func (c Consumer) StartReliableConsumer(ctx context.Context, rdb *redis.Client, wg *sync.WaitGroup) {
-	wg.Add(1)
-	c.count++
-
+func (c *Consumer) StartReliableConsumer(ctx context.Context, key int, rdb *redis.Client, wg *sync.WaitGroup) {
 	// to simulate a crash
-	randTimeout := time.Duration(1+rand.Intn(5)) * time.Second
+	randTimeout := time.Duration(3+rand.Intn(5)) * time.Second
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, randTimeout)
-	defer cancel()
+	defer func() {
+		cancel()
+		if r := recover(); r != nil {
+			fmt.Println("Reliable consumer crashes", r)
+		}
+	}()
 
-	go reliableConsumer(ctxWithTimeout, c.count, rdb, wg)
+	reliableConsumer(ctxWithTimeout, key, rdb, wg)
 }
 
 func consumer(ctx context.Context, k int, rdb *redis.Client, wg *sync.WaitGroup) {
@@ -71,7 +67,7 @@ func reliableConsumer(ctx context.Context, k int, rdb *redis.Client, wg *sync.Wa
 			return
 		}
 
-		fmt.Printf("job from reliable queue %s\n", jobRecovered)
+		fmt.Printf("[%d::RELIABLE PROCESSING] %s\n", k, jobRecovered)
 		_, err := popFromTempQueue(ctx, rdb, jobRecovered)
 		if err != nil {
 			fmt.Println(err)
@@ -88,10 +84,9 @@ func reliableConsumer(ctx context.Context, k int, rdb *redis.Client, wg *sync.Wa
 
 		select {
 		case <-ctx.Done():
-			fmt.Println("crash!")
-			return
+			panic("crash!!")
 		default:
-			fmt.Printf("[%d::PROCESSING] %s\n", k, job)
+			fmt.Printf("[%d::RELIABLE PROCESSING] %s\n", k, job)
 			_, err := popFromTempQueue(ctx, rdb, job)
 			if err != nil {
 				fmt.Println(err)
