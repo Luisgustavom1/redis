@@ -1,0 +1,16 @@
+version: '2'
+
+networks:
+  queue:
+    driver: bridge
+
+services:
+  redis:
+    container_name: queue-redis
+    image: 'bitnami/redis:latest'
+    ports : 
+      - '6379:6379'
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    networks:
+      - queue
