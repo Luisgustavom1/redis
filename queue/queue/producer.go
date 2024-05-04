@@ -1,4 +1,4 @@
-package main
+package queue
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func producer(ctx context.Context, rdb *redis.Client) {
+func StartProducer(ctx context.Context, rdb *redis.Client) {
 	fmt.Sprintln("Pushing jobs to the queue")
 
 	ticker := time.NewTicker(1 * time.Second)

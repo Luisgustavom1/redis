@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/luisgustavom1/redis/queue/queue"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -17,11 +18,12 @@ func main() {
 
 	wg := sync.WaitGroup{}
 
-	go producer(ctx, rdb)
+	go queue.StartProducer(ctx, rdb)
 
-	startConsumer(ctx, 1, rdb, &wg)
-	startConsumer(ctx, 2, rdb, &wg)
-	startReliableConsumer(ctx, 3, rdb, &wg)
+	consumer := queue.NewConsumerClient()
+	consumer.StartConsumer(ctx, rdb, &wg)
+	consumer.StartConsumer(ctx, rdb, &wg)
+	consumer.StartReliableConsumer(ctx, rdb, &wg)
 
 	wg.Wait()
 }
